@@ -1,17 +1,15 @@
-fun! s:validate(node)
-  let l:node = s:normalize_node(a:node)
-
-  if !s:node_is_valid(l:node)
-    execute('echoerr "' . string(a:node) . ' is invalid"')
-    return 0
-  endif
-
-  return l:node
-endfun
-
-fun! s:node_is_valid(node)
-  return len(a:node) == 12 ? 1 : 0
-endfun
+let s:def_layt = {
+      \  'name': 'default',
+      \  'bot': 
+      \  {
+      \    'sz': 12,
+      \    'init': ['setlocal nonumber', 'term bash'],
+      \    'left': 
+      \    {
+      \      'init': ['setlocal nonumber','term bash']
+      \    }
+      \  }
+      \}
 
 fun! s:normalize_node(node)
   let l:node = a:node
@@ -38,6 +36,12 @@ fun! s:normalize_node(node)
   endif
   if !exists('a:node.abs')
     let l:node['abs'] = 1
+  endif
+  if !exists('a:node.active')
+    let l:node['active'] = 0
+  endif
+  if !exists('a:node.fixed')
+    let l:node['fixed'] = 0
   endif
   if s:node_has_child(a:node, 'left')
     call s:normalize_node(a:node.left)
@@ -75,11 +79,16 @@ fun! s:node_has_child(node, pos)
 endfun
 
 fun! s:init()  
-  let l:i = 0
-  for node in g:vwm#layouts 
-    let g:vwm#layouts[i] = s:validate(node) 
-    let l:i = l:i + 1
-  endfor
+  if exists('g:vwm#layouts')
+    let l:i = 0
+    for node in g:vwm#layouts 
+      let g:vwm#layouts[i] = s:normalize_node(node) 
+      let l:i = l:i + 1
+    endfor
+  else
+    let g:vwm#layouts =[s:def_layt]
+    call s:init()
+  endif
 endfun
 
 call s:init()
@@ -87,3 +96,4 @@ call s:init()
 command! VwmRefresh call s:init()
 command! -nargs=1 VwmOpen call vwm#open(<q-args>)
 command! -nargs=1 VwmClose call vwm#close(<q-args>)
+command! -nargs=1 VwmToggle call vwm#toggle(<q-args>)

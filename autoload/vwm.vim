@@ -5,6 +5,7 @@ fun! vwm#close(name)
   if l:node_index == -1
     return -1
   endif
+  let g:vwm#layouts[l:node_index].active = 0
   let l:node = g:vwm#layouts[l:node_index]
   call s:close_main(l:node, l:node.cache, l:node.unlisted)
 endfun
@@ -42,6 +43,7 @@ fun! vwm#open(name)
   if l:nodeIndex == -1
     return -1
   endif
+  let g:vwm#layouts[l:nodeIndex].active = 1
   let l:node = g:vwm#layouts[l:nodeIndex]
   call s:close_main(l:node, l:node.cache, l:node.unlisted)
   let l:bid = bufwinnr('%')
@@ -49,82 +51,94 @@ fun! vwm#open(name)
   if s:node_has_child(l:node, 'left')
     let l:mod = l:node.abs ? 'to' : ''
     execute('vert ' . l:mod . ' ' . 'new')
-    if l:node.left.sz
-      execute(l:node.left.sz . 'wincmd |')
-    endif
-    let g:vwm#layouts[l:nodeIndex].left = s:open_main(l:node.left, l:node.unlisted)
+    let g:vwm#layouts[l:nodeIndex].left = s:open_main(l:node.left, l:node.unlisted, 1)
   endif
   execute(bufwinnr(l:bid) . 'wincmd w')
   if s:node_has_child(l:node, 'right')
     let l:mod = l:node.abs ? 'bo' : 'bel'
     execute('vert ' . l:mod . ' ' . 'new')
-    if l:node.right.sz
-      execute(l:node.right.sz . 'wincmd |')
-    endif
-    let g:vwm#layouts[l:nodeIndex].right = s:open_main(l:node.right, l:node.unlisted)
+    let g:vwm#layouts[l:nodeIndex].right = s:open_main(l:node.right, l:node.unlisted, 1)
   endif
   execute(bufwinnr(l:bid) . 'wincmd w')
   if s:node_has_child(l:node, 'top')
     let l:mod = l:node.abs ? 'to' : ''
-    execute(l:mod . ' ' . l:node.bot.sz . 'new')
-    let g:vwm#layouts[l:nodeIndex].top = s:open_main(l:node.top, l:node.unlisted)
+    execute(l:mod . ' ' . 'new')
+    let g:vwm#layouts[l:nodeIndex].top = s:open_main(l:node.top, l:node.unlisted, 0)
   endif
   execute(bufwinnr(l:bid) . 'wincmd w')
   if s:node_has_child(l:node, 'bot')
     let l:mod = l:node.abs ? 'bo' : 'bel'
-    execute(l:mod . ' ' . l:node.bot.sz . 'new')
-    let g:vwm#layouts[l:nodeIndex].bot = s:open_main(l:node.bot, l:node.unlisted)
+    execute(l:mod . ' ' . 'new')
+    let g:vwm#layouts[l:nodeIndex].bot = s:open_main(l:node.bot, l:node.unlisted, 0)
   endif
+  execute(bufwinnr(l:bid) . 'wincmd w')
 endfun
 
-fun! s:open_main(node, unlisted)
-  let l:commands = s:buf_exists(a:node.bid) ? a:node.restore : a:node.init
+fun! s:open_main(node, unlisted, isVert)
   let l:node = a:node
   let l:node.bid = s:place_content(a:node)
-  if a:unlisted
-    setlocal nobuflisted
-  endif
 
   if s:node_has_child(a:node, 'left')
-    execute('vert ' . 'new')
-    if l:node.left.sz
-      execute(l:node.left.sz . 'wincmd |')
-    endif
-    let l:node.left = s:open_main(a:node.left, a:unlisted)
+    vert new
+    let l:node.left = s:open_main(a:node.left, a:unlisted, 1)
   endif
   execute(bufwinnr(l:node.bid) . 'wincmd w')
   if s:node_has_child(a:node, 'right')
-    execute('vert belowright ' . 'new')
-    if l:node.right.sz
-      execute(l:node.right.sz . 'wincmd |')
-    endif
-    let l:node.right = s:open_main(a:node.right, a:unlisted)
+    vert belowright new
+    let l:node.right = s:open_main(a:node.right, a:unlisted, 1)
   endif
   execute(bufwinnr(l:node.bid) . 'wincmd w')
   if s:node_has_child(a:node, 'top')
-    execute(a:node.top.sz . 'new')
-    let l:node.top = s:open_main(a:node.top, a:unlisted)
+    new
+    let l:node.top = s:open_main(a:node.top, a:unlisted, 0)
   endif
   execute(bufwinnr(l:node.bid) . 'wincmd w')
   if s:node_has_child(a:node, 'bot')
-    execute('belowright ' . a:node.bot.sz . 'new')
-    let l:node.bot = s:open_main(a:node.bot, a:unlisted)
+    belowright new
+    let l:node.bot = s:open_main(a:node.bot, a:unlisted, 0)
   endif
   execute(bufwinnr(l:node.bid) . 'wincmd w')
+  call s:format_winnode(a:node, a:unlisted, a:isVert) 
   return l:node
 endfun
 
-fun! s:place_content(node)
-  let l:commands = a:node.init
-  if s:buf_exists(a:node.bid)
-    let l:to_del = bufnr('%')
-    execute(a:node.bid . 'b')
-    execute(bufnr('#') . 'bw')
-    let l:commands = a:node.restore 
+fun! vwm#toggle(name)
+  let l:nodeIndex = s:lookup_node(a:name)
+  if l:nodeIndex == -1
+    return -1
   endif
-  for cmd in l:commands
+  let l:node = g:vwm#layouts[l:nodeIndex]
+
+  if l:node.active
+    call vwm#close(a:name)
+  else
+    call vwm#open(a:name)
+  endif
+endfun
+
+fun! s:place_content(node)
+  let l:init_buf = bufnr('%')
+  let l:init_wid = bufwinnr(l:init_buf)
+  if s:buf_exists(a:node.bid)
+    execute(a:node.bid . 'b')
+    execute(l:init_buf . 'bw')
+    for cmd in a:node.restore
+      execute(cmd)
+    endfor
+    return bufnr('%')
+  endif
+  for cmd in a:node.init
     execute(cmd)
   endfor
+  let l:final_buf = bufnr('$')
+  let l:final_wid = bufwinnr(l:final_buf)
+  if l:init_wid != l:final_wid
+    execute(l:final_wid . 'wincmd w')
+    wincmd c
+    execute(l:init_wid . 'wincmd w')
+    execute(l:final_buf . 'b')
+    execute(l:init_buf . 'bw')
+  endif
   return bufnr('%')
 endfun
 
@@ -154,4 +168,24 @@ fun! s:lookup_node(name)
   endfor
   execute("echoerr '" . a:name . " not in list of root nodes'")
   return -1
+endfun
+
+fun! s:format_winnode(node, unlisted, isVert)
+  if a:node.sz
+    if a:isVert
+      execute('vert resize ' . a:node.sz)
+    else
+      execute('resize ' . a:node.sz)
+    endif
+  endif
+  if a:unlisted
+    setlocal nobuflisted
+  endif
+  if a:node.fixed
+    if a:isVert
+      setlocal winfixwidth
+    else
+      setlocal winfixheight
+    endif
+  endif
 endfun
