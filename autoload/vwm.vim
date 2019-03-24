@@ -71,7 +71,6 @@ fun! vwm#open(name)
     execute(l:mod . ' ' . 'new')
     let g:vwm#layouts[l:nodeIndex].bot = s:open_main(l:node.bot, l:node.unlisted, 0)
   endif
-  execute(bufwinnr(l:bid) . 'wincmd w')
 endfun
 
 fun! s:open_main(node, unlisted, isVert)
@@ -98,7 +97,7 @@ fun! s:open_main(node, unlisted, isVert)
     let l:node.bot = s:open_main(a:node.bot, a:unlisted, 0)
   endif
   execute(bufwinnr(l:node.bid) . 'wincmd w')
-  call s:format_winnode(a:node, a:unlisted, a:isVert) 
+  call s:format_winnode(a:node, a:unlisted, a:isVert)
   return l:node
 endfun
 
@@ -159,7 +158,7 @@ endfun
 
 fun! s:lookup_node(name)
   let l:i = 0
-  for layout_root in g:vwm#layouts 
+  for layout_root in g:vwm#layouts
     let l:layout_name = layout_root.name
     if l:layout_name =~ a:name
       return l:i
